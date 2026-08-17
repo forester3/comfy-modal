@@ -26,30 +26,39 @@ app = modal.App(
                         f"apt install -y ./{deb_file}",
                         f"rm -f {deb_file}")
         .run_commands(  f"mkdir -p '{theme_config_dir}'",
-                    # 2. ダークテーマを指定した JSON ファイルを作成
+                    # ダークテーマを指定した JSON ファイルを作成
                         f'echo \'{{"theme": "JupyterLab Dark"}}\' > "{theme_config_dir}/themes.jupyterlab-settings"')
-        .run_commands("cd /root && git clone --depth=1 https://github.com/forester3/comfy-work-steps.git # {sha}")
 )
-
 
 output_vol = modal.Volume.from_name( "comfy-output", create_if_missing=True )
 models_vol = modal.Volume.from_name( "comfy-models", create_if_missing=True )
 
 JUPYTER_TOKEN = "zero"  # Change me to something non-guessable!
 
-
 # This is all that's needed to create a long-lived Jupyter server process in Modal
 # that you can access in your Browser through a secure network tunnel.
 # This can be useful when you want to interactively engage with Volume contents
 # without having to download it to your host computer.
 
-
 @app.function(max_containers=1,
               volumes={"/root/ComfyUI/output": output_vol, 
                        "/root/ComfyUI/models": models_vol, }, 
               secrets=[modal.Secret.from_dotenv()],
-              timeout=1_500)
+              cpu=1.0,
+              timeout=3_000)
 def run_jupyter(timeout: int):
+
+    repo_dir = "/tmp/comfy-work-steps"
+    if not os.path.exists(repo_dir):
+        print("Cloning repository into /tmp...")
+        subprocess.run(
+            ["git", "clone", "--depth=1", "https://github.com/forester3/comfy-work-steps.git", repo_dir],
+            check=True
+        )
+    link_path = "/root/comfy-work-steps"
+    if not os.path.exists(link_path):
+        os.symlink(repo_dir, link_path)
+
     jupyter_port = 8888
     with modal.forward(jupyter_port) as tunnel:
         jupyter_process = subprocess.Popen(
@@ -65,7 +74,7 @@ def run_jupyter(timeout: int):
         )
 
         print("⚡" * 40)
-        print(f"JupyterLab 🔌 {tunnel.url}")
+        print(f"🟡 JupyterLab {tunnel.url} 🟡")
         print("⚡" * 40)
 
         try:
