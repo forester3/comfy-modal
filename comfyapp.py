@@ -16,11 +16,8 @@ image = (
     .apt_install("git", "ffmpeg", "libgl1-mesa-glx", "libglib2.0-0")
 
     # 3. 指定のPyTorchをインストール（extra_index_url を使用）
-    .pip_install(
-        "torch==2.11.0+cu128",
-        "torchaudio==2.11.0+cu128",
-        "torchvision==0.26+cu128",
-        extra_index_url="https://download.pytorch.org/whl/cu128",
+    .pip_install(  "torch", "torchvision", "torchaudio",
+        extra_options="--upgrade --index-url https://download.pytorch.org/whl/cu130"
     )
     
     # 4. ComfyUIのクローンと依存パッケージのセットアップ
@@ -45,6 +42,8 @@ app = modal.App(name="comfyapp", image=image)
     scaledown_window=900,
     timeout=1800,
     gpu="L4",
+    cpu=2.0,
+    memory=32768,
     volumes={ "/root/ComfyUI/models": model_volume,
               "/root/ComfyUI/output": output_volume }
 )
@@ -60,7 +59,7 @@ def run_comfy():
 
     with modal.forward(8188) as tunnel:
         print("⚡" * 40)
-        print(f" 🔌 接続URL: {tunnel.url} 🔌")
+        print(f" 🟡 接続URL: {tunnel.url} 🟡")
         print("⚡" * 40)
         
         try:
