@@ -12,6 +12,8 @@ import subprocess
 import time
 import modal
 
+JUPYTER_TOKEN = "zero"  # Change me to something non-guessable!
+JUPYTER_PORT = 8888
 deb_file = "megacmd-Debian_12_amd64.deb"
 deb_url = f"https://mega.nz/linux/repo/Debian_12/amd64/{deb_file}"
 theme_config_dir = "/root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension"
@@ -33,21 +35,16 @@ app = modal.App(
 output_vol = modal.Volume.from_name( "comfy-output", create_if_missing=True )
 models_vol = modal.Volume.from_name( "comfy-models", create_if_missing=True )
 
-JUPYTER_TOKEN = "zero"  # Change me to something non-guessable!
-
-# This is all that's needed to create a long-lived Jupyter server process in Modal
-# that you can access in your Browser through a secure network tunnel.
-# This can be useful when you want to interactively engage with Volume contents
-# without having to download it to your host computer.
 
 @app.function(max_containers=1,
               volumes={"/root/ComfyUI/output": output_vol, 
                        "/root/ComfyUI/models": models_vol, }, 
               secrets=[modal.Secret.from_dotenv()],
               cpu=1.0,
-              timeout=3_000)
-def run_jupyter(timeout: int):
+              scaledown_window=1200,
+              timeout=3600)
 
+def run_jupyter():
     repo_dir = "/tmp/comfy-work-steps"
     if not os.path.exists(repo_dir):
         print("Cloning repository into /tmp...")
@@ -59,13 +56,12 @@ def run_jupyter(timeout: int):
     if not os.path.exists(link_path):
         os.symlink(repo_dir, link_path)
 
-    jupyter_port = 8888
-    with modal.forward(jupyter_port) as tunnel:
+    with modal.forward(JUPYTER_PORT) as tunnel:
         jupyter_process = subprocess.Popen(
             [
                 "jupyter", "lab",
                 "--no-browser", "--allow-root", "--ip=0.0.0.0",
-                f"--port={jupyter_port}",
+                f"--port={JUPYTER_PORT}",
                 "--NotebookApp.allow_origin='*'",
                 "--NotebookApp.allow_remote_access=1",
                 "--notebook-dir=/root",
@@ -74,21 +70,15 @@ def run_jupyter(timeout: int):
         )
 
         print("⚡" * 40)
-        print(f"🟡 JupyterLab {tunnel.url} 🟡")
-        print("⚡" * 40)
+        print(f"⚡ \033[0mJupyterLab URL: {tunnel.url} \033[0m⚡")
 
         try:
-            end_time = time.time() + timeout
-            while time.time() < end_time:
-                time.sleep(5)
-            print(f"Reached end of {timeout} second timeout period. Exiting...")
+            jupyter_process.wait()
         except KeyboardInterrupt:
             print("Exiting...")
         finally:
             jupyter_process.kill()
 
-
 @app.local_entrypoint()
-def main(timeout: int = 10_000):
-    # Run the Jupyter server
-    run_jupyter.remote(timeout=timeout)
+def main():
+    run_jupyter.remote()
