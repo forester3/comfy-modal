@@ -2,7 +2,8 @@ import json
 import random 
 from datetime import datetime
 
-WORKFLOW_FILE = "/root/workflow/260817-bf_00021_.json"
+WORKFLOW_FILE = "/root/workflow/260817-krea2-turbo.json"
+#WORKFLOW_FILE = "/root/workflow/260821-museext-special.json"
 
 def remake_workflow( model_name:str, positive=None, seed=None, suffix=None):
     with open(WORKFLOW_FILE, "r", encoding="utf-8") as f:

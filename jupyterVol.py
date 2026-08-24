@@ -22,7 +22,7 @@ app = modal.App(
     "jupyter-inside-modal",
     image=modal.Image.debian_slim(python_version="3.12")
         .apt_install("bash", "git", "wget", "aria2")
-        .uv_pip_install("jupyterlab", "ipywidgets")
+        .uv_pip_install("jupyterlab", "ipywidgets", "python-dotenv")
         .env({"SHELL": "/bin/bash"})
         .run_commands(  f"wget -q -O {deb_file} {deb_url}", 
                         f"apt install -y ./{deb_file}",
