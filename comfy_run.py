@@ -3,11 +3,19 @@ import time
 import requests
 import modal
 from pathlib import Path
+# local module
+from procedure import procedure    
 
 COMFY_PORT = 8188
 TIMEOUT = 7200
 NODES = [   "https://github.com/ltdrdata/ComfyUI-Manager.git",
-            "https://github.com/MoonGoblinDev/Civicomfy.git",   ]
+            "https://github.com/MoonGoblinDev/Civicomfy.git",
+            "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git",
+            "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git",
+            "https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git",
+            "https://github.com/1038lab/ComfyUI-QwenVL.git",
+            "https://github.com/ClownsharkBatwing/RES4LYF.git",
+            "https://github.com/blue-pen5805/ComfyUI-krea2-negpip.git" ]
 COMFY_STATS = "http://127.0.0.1:8188/system_stats"
 
 model_volume = modal.Volume.from_name( "comfy-models", create_if_missing=True )
@@ -20,11 +28,17 @@ image = (
         extra_options=( "--upgrade " "--index-url https://download.pytorch.org/whl/cu130" )
     )
     .run_commands(
+        "pip install --upgrade pip",
         "git clone https://github.com/Comfy-Org/ComfyUI /root/ComfyUI",
         "cd /root/ComfyUI && pip install -r requirements.txt",
     )
     .run_commands(
-        *[f"cd /root/ComfyUI/custom_nodes && git clone {node}" for node in NODES]
+        *[f"cd /root/ComfyUI/custom_nodes && git clone {node}" for node in NODES],
+    )
+    .run_commands(
+        "pip install -r /root/ComfyUI/custom_nodes/ComfyUI-Impact-Pack/requirements.txt",
+        "pip install -r /root/ComfyUI/custom_nodes/ComfyUI-Impact-Subpack/requirements.txt",
+        "pip install -r /root/ComfyUI/custom_nodes/RES4LYF/requirements.txt",
     )
     .pip_install( "bitsandbytes", "transformers", "accelerate", "websocket-client" )
                                                                 # for API
@@ -36,7 +50,6 @@ image = (
     .add_local_python_source( "generate", "workflow", "procedure" ) # API作画モジュール
 )
 
-from procedure import procedure
 
 app = modal.App( name="comfy-modal", image=image )
 
@@ -44,10 +57,11 @@ app = modal.App( name="comfy-modal", image=image )
     max_containers=1,
     scaledown_window=1200,
     timeout=TIMEOUT,
-    gpu="L4", cpu=2.0, memory=32768,
+    gpu=["L4", "A10G"], cpu=2.0, memory=32768,
     volumes={   "/root/ComfyUI/models": model_volume,
                 "/root/ComfyUI/output": output_volume,  }
 )
+
 def run_comfy( api_mode: bool  ):
     print("🔴 Starting ComfyUI...")
     process = subprocess.Popen([    "python", "/root/ComfyUI/main.py",
